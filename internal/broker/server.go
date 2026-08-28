@@ -39,6 +39,14 @@ func NewServer(tasks TaskQueue) *Server {
 	}
 }
 
+func (s *Server) Routes() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /jobs", s.handleEnqueue)
+
+	return mux
+}
+
 func statusForStoreError(err error) int {
 	switch {
 	case errors.Is(err, store.ErrNotHeld):
