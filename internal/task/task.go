@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type State string 
+type State string
 
 const (
 	StateReady    State = "ready"
@@ -29,17 +29,17 @@ type Task struct {
 }
 
 func New(payload json.RawMessage, maxAttempts int, delay time.Duration) *Task {
-	if( maxAttempts <= 0 ) {
+	if maxAttempts <= 0 {
 		maxAttempts = DefaultMaxAttempts
 	}
 	now := time.Now().UTC()
 
 	return &Task{
-		ID: NewID(),
-		Payload: payload,
-		Attempts: 0,
+		ID:          NewID(),
+		Payload:     payload,
+		Attempts:    0,
 		MaxAttempts: maxAttempts,
-		CreatedAt: now,
+		CreatedAt:   now,
 		AvailableAt: now.Add(delay),
 	}
 }
