@@ -18,7 +18,10 @@ var (
 	ErrWrongLease = errors.New("store: lease id does not match")
 )
 
-const DefaultHoldTime = 30 * time.Second
+const (
+	DefaultHoldTime = 30 * time.Second
+	SweepEvery      = 250 * time.Millisecond
+)
 
 type Delivery struct {
 	Task     *task.Task `json:"task"`
@@ -131,6 +134,40 @@ func (s *MemStore) Nack(taskId, leaseId, reason string) error {
 	s.retryOrDelay(held.item, reason)
 
 	return nil
+}
+
+func (s *MemStore) Sweep(ctx context.Context) {
+	ticker := time.NewTicker(SweepEvery)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.sweepOnce()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (s *MemStore) sweepOnce() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.reclaimExpiredHolds()
+	s.promoteDueTasks()
+}
+
+func (s *MemStore) reclaimExpiredHolds() {
+	now := time.Now().UTC()
+
+	for taskID, held := range s.handedOut {
+		if held.deadline.After(now) {
+			continue
+		}
+		delete(s.handedOut, taskID)
+		s.retryOrDelay(held.item, "worker stopped responding")
+	}
 }
 
 func (s *MemStore) retryOrDelay(failed *task.Task, reason string) {
