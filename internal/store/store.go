@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -35,11 +36,14 @@ type Store interface {
 	Enqueue(t *task.Task) error
 	Dequeue(ctx context.Context, maxWait, holdFor time.Duration) (*Delivery, error)
 	Ack(taskId, leaseId string) error
+	Nack(taskId, leaseId, reason string) error
 }
 
 type MemStore struct {
 	lock      sync.Mutex
 	ready     []*task.Task
+	delayed   []*task.Task
+	dead      []*task.Task
 	handedOut map[string]*heldTask
 	wakeup    chan struct{}
 }
@@ -103,7 +107,6 @@ func (s *MemStore) Ack(taskId, leaseId string) error {
 	if !isHeld {
 		return ErrNotHeld
 	}
-
 	if held.leaseID != leaseId {
 		return ErrWrongLease
 	}
@@ -112,7 +115,39 @@ func (s *MemStore) Ack(taskId, leaseId string) error {
 	return nil
 }
 
+func (s *MemStore) Nack(taskId, leaseId, reason string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	held, isHeld := s.handedOut[taskId]
+	if !isHeld {
+		return ErrNotHeld
+	}
+	if held.leaseID != leaseId {
+		return ErrWrongLease
+	}
+
+	delete(s.handedOut, taskId)
+	s.retryOrDelay(held.item, reason)
+
+	return nil
+}
+
+func (s *MemStore) retryOrDelay(failed *task.Task, reason string) {
+	failed.LastError = reason
+
+	if failed.Attempts >= failed.MaxAttempts {
+		s.dead = append(s.dead, failed)
+		return
+	}
+
+	failed.AvailableAt = time.Now().UTC().Add(retryDelay(failed.Attempts))
+	s.delayed = append(s.delayed, failed)
+}
+
 func (s *MemStore) claimOldestTask(holdFor time.Duration) *Delivery {
+	s.promoteDueTasks()
+
 	if len(s.ready) == 0 {
 		return nil
 	}
@@ -137,6 +172,26 @@ func (s *MemStore) claimOldestTask(holdFor time.Duration) *Delivery {
 	}
 }
 
+func (s *MemStore) promoteDueTasks() {
+	if len(s.delayed) == 0 {
+		return
+	}
+
+	now := time.Now().UTC()
+	var stillWaiting []*task.Task
+
+	for _, waiting := range s.delayed {
+		if waiting.AvailableAt.After(now) {
+			stillWaiting = append(stillWaiting, waiting)
+			continue
+		}
+		s.ready = append(s.ready, waiting)
+	}
+	s.delayed = stillWaiting
+
+	s.wakeAll()
+}
+
 func (s *MemStore) HandedOutCount() int {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -151,7 +206,54 @@ func (s *MemStore) ReadyCount() int {
 	return len(s.ready)
 }
 
+func (s *MemStore) DelayedCount() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return len(s.delayed)
+}
+
+func (s *MemStore) DeadCount() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return len(s.dead)
+}
+
+func (s *MemStore) DeadTasks() []*task.Task {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	listed := make([]*task.Task, len(s.dead))
+	copy(listed, s.dead)
+
+	return listed
+}
+
 func (s *MemStore) wakeAll() {
 	close(s.wakeup)
 	s.wakeup = make(chan struct{})
+}
+
+func retryDelay(attempts int) time.Duration {
+	const fireDelay = time.Second
+	const longestDelay = 30 * time.Second
+
+	if attempts < 1 {
+		attempts = 1
+	}
+	if attempts > 10 {
+		attempts = 10
+	}
+
+	delay := fireDelay << (attempts - 1)
+	if delay > longestDelay {
+		delay = longestDelay
+	}
+
+	// Wait at least half that, plus a random slice of the other half, so a
+	// batch of tasks that failed together don't all retry at the same instant
+	// and knock over whatever they were failing against.
+	half := delay / 2
+	return half + time.Duration(rand.Int64N(int64(half)))
 }
