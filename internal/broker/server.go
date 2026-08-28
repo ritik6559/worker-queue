@@ -42,7 +42,13 @@ func NewServer(tasks TaskQueue) *Server {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /jobs", s.handleEnqueue)
+	mux.HandleFunc("GET /jobs/next", s.handleNext)
+	mux.HandleFunc("POST /jobs/{id}/ack", s.handleAck)
+	mux.HandleFunc("POST /jobs/{id}/nack", s.handleNack)
+	mux.HandleFunc("GET /stats", s.handleStats)
+	mux.HandleFunc("GET /dlq", s.handleDeadLetters)
 
 	return mux
 }
