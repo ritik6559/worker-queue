@@ -179,6 +179,7 @@ func (s *MemStore) promoteDueTasks() {
 
 	now := time.Now().UTC()
 	var stillWaiting []*task.Task
+	promoted := 0
 
 	for _, waiting := range s.delayed {
 		if waiting.AvailableAt.After(now) {
@@ -186,10 +187,13 @@ func (s *MemStore) promoteDueTasks() {
 			continue
 		}
 		s.ready = append(s.ready, waiting)
+		promoted++
 	}
 	s.delayed = stillWaiting
 
-	s.wakeAll()
+	if promoted > 0 {
+		s.wakeAll()
+	}
 }
 
 func (s *MemStore) HandedOutCount() int {
