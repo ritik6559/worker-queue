@@ -26,7 +26,7 @@ func NewClient(brokerURL string, longestWait time.Duration) *Client {
 	return &Client{
 		brokerURL: brokerURL,
 		http: &http.Client{
-			Timeout: longestWait + 15 * time.Second,
+			Timeout: longestWait + 15*time.Second,
 		},
 	}
 }
@@ -49,7 +49,7 @@ func (c *Client) Next(ctx context.Context, maxWait, holdFor time.Duration) (*sto
 	}
 	defer closeBody(response)
 
-	switch response.StatusCode{
+	switch response.StatusCode {
 	case http.StatusNoContent:
 		return nil, ErrNoTasks
 	case http.StatusOK:
@@ -108,7 +108,6 @@ func unexpectedStatus(response *http.Response) error {
 	detail, _ := io.ReadAll(io.LimitReader(response.Body, 512))
 	return fmt.Errorf("broker returned %s: %s", response.Status, bytes.TrimSpace(detail))
 }
-
 
 func closeBody(response *http.Response) {
 	_, _ = io.Copy(io.Discard, response.Body)

@@ -23,7 +23,7 @@ type LogSink struct {
 }
 
 func NewLogSink(path string) (*LogSink, error) {
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("could not open %s: %w", path, err)
 	}
@@ -43,13 +43,22 @@ func (l *LogSink) run() {
 	defer close(l.stopped)
 
 	for line := range l.lines {
-		encoded, err := json.Marshal(line)
-		if err != nil {
-			continue
+		l.writeLine(line)
+
+		if len(l.lines) == 0 {
+			_ = l.writer.Flush()
 		}
-		_, _ = l.writer.Write(encoded)
-		_ = l.writer.WriteByte('\n')
 	}
+}
+
+func (l *LogSink) writeLine(line logLine) {
+	encoded, err := json.Marshal(line)
+	if err != nil {
+		return // one bad payload isn't worth killing the writer over
+	}
+
+	_, _ = l.writer.Write(encoded)
+	_ = l.writer.WriteByte('\n')
 }
 
 func (l *LogSink) Append(line logLine) {
@@ -58,7 +67,7 @@ func (l *LogSink) Append(line logLine) {
 
 func (l *LogSink) Close() error {
 	close(l.lines)
-	<-l.stopped 
+	<-l.stopped
 
 	if err := l.writer.Flush(); err != nil {
 		_ = l.file.Close()

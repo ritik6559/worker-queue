@@ -25,17 +25,17 @@ func main() {
 
 	sink, err := worker.NewLogSink(*logPath)
 	if err != nil {
-		log.Fatalf("could not open log file: %v", err)	
-	}	
+		log.Fatalf("could not open log file: %v", err)
+	}
 
 	client := worker.NewClient(*brokerURL, time.Duration(*maxWaitMS)*time.Millisecond)
 
 	log.Printf("%d workers against %s, appending to %s", *count, *brokerURL, *logPath)
 
 	worker.Run(ctx, client, sink, &worker.Config{
-		Count: *count,
-		MaxWait: time.Duration(*maxWaitMS) * time.Millisecond,
-		HoldFor: time.Duration(*holdForMS) * time.Millisecond,
+		Count:      *count,
+		MaxWait:    time.Duration(*maxWaitMS) * time.Millisecond,
+		HoldFor:    time.Duration(*holdForMS) * time.Millisecond,
 		RetryPause: time.Second,
 	})
 

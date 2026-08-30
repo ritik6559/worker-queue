@@ -42,7 +42,7 @@ func main() {
 	<-ctx.Done()
 	log.Printf("shutting down")
 
-	shutDownCtx, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
+	shutDownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutDownCtx); err != nil {

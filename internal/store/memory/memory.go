@@ -43,7 +43,7 @@ func (s *Store) Enqueue(t *task.Task) error {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	
+
 	if t.AvailableAt.After(time.Now().UTC()) {
 		s.delayed = append(s.delayed, t)
 		return nil

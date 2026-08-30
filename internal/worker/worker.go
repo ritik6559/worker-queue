@@ -23,10 +23,10 @@ func Run(ctx context.Context, client *Client, sink *LogSink, config *Config) {
 
 	for number := 1; number <= config.Count; number++ {
 		running.Add(1)
-		go func ()  {
+		go func() {
 			defer running.Done()
 			workUntilDone(ctx, client, sink, config, number)
-		} ()
+		}()
 	}
 
 	running.Wait()
@@ -39,7 +39,7 @@ func workUntilDone(ctx context.Context, client *Client, sink *LogSink, config *C
 		}
 
 		delivery, err := client.Next(ctx, config.MaxWait, config.HoldFor)
-		
+
 		switch {
 		case errors.Is(err, ErrNoTasks):
 			continue
@@ -57,7 +57,7 @@ func workUntilDone(ctx context.Context, client *Client, sink *LogSink, config *C
 
 		if err := handle(sink, delivery); err != nil {
 			log.Printf("worker %d: task %s failed: %v", number, delivery.Task.ID, err)
-			if err := client.Nack(ctx, delivery.Task.ID, delivery.LeaseID, err.Error()); err != nil {
+			if err := client.Nack(finish, delivery.Task.ID, delivery.LeaseID, err.Error()); err != nil {
 				log.Printf("worker %d: could not nack %s: %v", number, delivery.Task.ID, err)
 			}
 		} else if err := client.Ack(finish, delivery.Task.ID, delivery.LeaseID); err != nil {
@@ -98,7 +98,7 @@ func pause(ctx context.Context, howLong time.Duration) {
 	timer := time.NewTimer(howLong)
 	defer timer.Stop()
 
-	select{
+	select {
 	case <-timer.C:
 	case <-ctx.Done():
 	}

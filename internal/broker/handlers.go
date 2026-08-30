@@ -19,9 +19,11 @@ func (s *Server) handleEnqueue(w http.ResponseWriter, r *http.Request) {
 	var request enqueueRequest
 	if err := decodeJSON(w, r, &request); err != nil {
 		writeError(w, http.StatusBadRequest, "could not read request: "+err.Error())
+		return
 	}
 	if len(request.Payload) == 0 {
 		writeError(w, http.StatusBadRequest, "payload is required")
+		return
 	}
 
 	newTask := task.New(
@@ -40,10 +42,10 @@ func (s *Server) handleEnqueue(w http.ResponseWriter, r *http.Request) {
 
 // This is the long-poll: it holds the connection open until a task turns up
 func (s *Server) handleNext(w http.ResponseWriter, r *http.Request) {
-	maxWait := durationParam(r, "max_wait", DefaultWait, LongestWait)
-	holdeFor := durationParam(r, "lease_ms", store.DefaultHoldTime, LongestHold)
+	maxWait := durationParam(r, "wait_ms", DefaultWait, LongestWait)
+	holdFor := durationParam(r, "lease_ms", store.DefaultHoldTime, LongestHold)
 
-	delivery, err := s.tasks.Dequeue(r.Context(), maxWait, holdeFor)
+	delivery, err := s.tasks.Dequeue(r.Context(), maxWait, holdFor)
 
 	switch {
 	case errors.Is(err, store.ErrNoTasks):
@@ -86,7 +88,7 @@ func (s *Server) handleNack(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request nackRequest
-	if err := decodeJSON(w, r, request); err != nil && !errors.Is(err, io.EOF) {
+	if err := decodeJSON(w, r, &request); err != nil && !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "could not read request: "+err.Error())
 		return
 	}
