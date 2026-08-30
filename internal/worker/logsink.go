@@ -36,7 +36,7 @@ func NewLogSink(path string) (*LogSink, error) {
 	}
 	go sink.run()
 
-	return sink, err
+	return sink, nil
 }
 
 func (l *LogSink) run() {
