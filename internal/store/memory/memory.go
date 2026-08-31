@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -62,6 +63,31 @@ func (s *Store) Enqueue(t *task.Task) error {
 
 func (s *Store) Totals() metrics.Snapshot {
 	return s.counters.Snapshot()
+}
+
+func (s *Store) RequeueDead(taskID string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	position := slices.IndexFunc(s.dead, func(buried *task.Task) bool {
+		return buried.ID == taskID
+	})
+	if position < 0 {
+		return store.ErrNotBuried
+	}
+
+	revived := s.dead[position]
+	s.dead = slices.Delete(s.dead, position, position+1)
+
+	revived.Attempts = 0
+	revived.LastError = ""
+	revived.AvailableAt = time.Now().UTC()
+
+	s.ready = append(s.ready, revived)
+	s.wakeAll()
+	s.counters.Requeued.Add(1)
+
+	return nil
 }
 
 func (s *Store) Dequeue(ctx context.Context, maxWait, holdFor time.Duration) (*store.Delivery, error) {

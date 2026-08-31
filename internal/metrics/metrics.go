@@ -10,6 +10,7 @@ type Counters struct {
 	Reclaimed atomic.Int64
 	Retried   atomic.Int64
 	Buried    atomic.Int64
+	Requeued  atomic.Int64
 }
 
 type Snapshot struct {
@@ -20,6 +21,7 @@ type Snapshot struct {
 	Reclaimed int64 `json:"reclaimed"`
 	Retried   int64 `json:"retried"`
 	Buried    int64 `json:"buried"`
+	Requeued  int64 `json:"requeued"`
 }
 
 func (c *Counters) Snapshot() Snapshot {
@@ -31,5 +33,6 @@ func (c *Counters) Snapshot() Snapshot {
 		Reclaimed: c.Reclaimed.Load(),
 		Retried:   c.Retried.Load(),
 		Buried:    c.Buried.Load(),
+		Requeued:  c.Requeued.Load(),
 	}
 }

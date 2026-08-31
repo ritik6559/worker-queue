@@ -115,6 +115,15 @@ func (s *Server) handleDeadLetters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, buried)
 }
 
+func (s *Server) handleRequeue(w http.ResponseWriter, r *http.Request) {
+	if err := s.tasks.RequeueDead(r.PathValue("id")); err != nil {
+		writeError(w, statusForStoreError(err), err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, statsResponse{
 		Ready:     s.tasks.ReadyCount(),

@@ -28,6 +28,7 @@ type TaskQueue interface {
 	DelayedCount() int
 	DeadCount() int
 	DeadTasks() []*task.Task
+	RequeueDead(taskID string) error
 	Totals() metrics.Snapshot
 }
 
@@ -51,13 +52,14 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /jobs/{id}/nack", s.handleNack)
 	mux.HandleFunc("GET /stats", s.handleStats)
 	mux.HandleFunc("GET /dlq", s.handleDeadLetters)
+	mux.HandleFunc("POST /dlq/{id}/requeue", s.handleRequeue)
 
 	return mux
 }
 
 func statusForStoreError(err error) int {
 	switch {
-	case errors.Is(err, store.ErrNotHeld):
+	case errors.Is(err, store.ErrNotHeld), errors.Is(err, store.ErrNotBuried):
 		return http.StatusNotFound
 	case errors.Is(err, store.ErrWrongLease):
 		return http.StatusConflict

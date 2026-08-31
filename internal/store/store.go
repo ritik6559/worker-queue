@@ -15,6 +15,7 @@ var (
 	ErrNoTasks    = errors.New("store: no tasks available")
 	ErrNotHeld    = errors.New("store: task is not held by any worker")
 	ErrWrongLease = errors.New("store: lease id does not match")
+	ErrNotBuried  = errors.New("store: task is not in the dead-letter queue")
 )
 
 const DefaultHoldTime = 30 * time.Second
