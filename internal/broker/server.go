@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ritik6559/worker-queue/internal/metrics"
 	"github.com/ritik6559/worker-queue/internal/store"
 	"github.com/ritik6559/worker-queue/internal/task"
 )
@@ -27,6 +28,7 @@ type TaskQueue interface {
 	DelayedCount() int
 	DeadCount() int
 	DeadTasks() []*task.Task
+	Totals() metrics.Snapshot
 }
 
 type Server struct {

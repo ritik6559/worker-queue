@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ritik6559/worker-queue/internal/metrics"
 	"github.com/ritik6559/worker-queue/internal/store"
 	"github.com/ritik6559/worker-queue/internal/task"
 )
@@ -22,6 +23,7 @@ type Store struct {
 	dead      []*task.Task
 	handedOut map[string]*heldTask
 	wakeup    chan struct{}
+	counters  *metrics.Counters
 }
 
 var _ store.Store = (*Store)(nil)
@@ -30,6 +32,7 @@ func New() *Store {
 	return &Store{
 		handedOut: make(map[string]*heldTask),
 		wakeup:    make(chan struct{}),
+		counters:  &metrics.Counters{},
 	}
 }
 
@@ -46,13 +49,19 @@ func (s *Store) Enqueue(t *task.Task) error {
 
 	if t.AvailableAt.After(time.Now().UTC()) {
 		s.delayed = append(s.delayed, t)
+		s.counters.Enqueued.Add(1)
 		return nil
 	}
 
 	s.ready = append(s.ready, t)
 	s.wakeAll()
+	s.counters.Enqueued.Add(1)
 
 	return nil
+}
+
+func (s *Store) Totals() metrics.Snapshot {
+	return s.counters.Snapshot()
 }
 
 func (s *Store) Dequeue(ctx context.Context, maxWait, holdFor time.Duration) (*store.Delivery, error) {
@@ -95,6 +104,8 @@ func (s *Store) Ack(taskId, leaseId string) error {
 	}
 
 	delete(s.handedOut, taskId)
+	s.counters.Acked.Add(1)
+
 	return nil
 }
 
@@ -111,6 +122,7 @@ func (s *Store) Nack(taskId, leaseId, reason string) error {
 	}
 
 	delete(s.handedOut, taskId)
+	s.counters.Nacked.Add(1)
 	s.retryOrDelay(held.item, reason)
 
 	return nil
@@ -121,11 +133,13 @@ func (s *Store) retryOrDelay(failed *task.Task, reason string) {
 
 	if failed.Attempts >= failed.MaxAttempts {
 		s.dead = append(s.dead, failed)
+		s.counters.Buried.Add(1)
 		return
 	}
 
 	failed.AvailableAt = time.Now().UTC().Add(store.RetryDelay(failed.Attempts))
 	s.delayed = append(s.delayed, failed)
+	s.counters.Retried.Add(1)
 }
 
 func (s *Store) claimOldestTask(holdFor time.Duration) *store.Delivery {
@@ -147,6 +161,7 @@ func (s *Store) claimOldestTask(holdFor time.Duration) *store.Delivery {
 		deadline: time.Now().UTC().Add(holdFor),
 	}
 	s.handedOut[oldest.ID] = held
+	s.counters.Delivered.Add(1)
 
 	return &store.Delivery{
 		Task:     oldest,

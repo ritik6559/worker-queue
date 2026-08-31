@@ -39,6 +39,7 @@ func (s *Store) reclaimExpiredHolds() {
 			continue
 		}
 		delete(s.handedOut, taskID)
+		s.counters.Reclaimed.Add(1)
 		s.retryOrDelay(held.item, "worker stopped responding")
 	}
 }

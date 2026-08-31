@@ -1,6 +1,10 @@
 package broker
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/ritik6559/worker-queue/internal/metrics"
+)
 
 type enqueueRequest struct {
 	Payload     json.RawMessage `json:"payload"`
@@ -21,6 +25,8 @@ type statsResponse struct {
 	HandedOut int `json:"handed_out"`
 	Delayed   int `json:"delayed"`
 	Dead      int `json:"dead"`
+
+	Totals metrics.Snapshot `json:"totals"`
 }
 
 type errorResponse struct {

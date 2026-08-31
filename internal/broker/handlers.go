@@ -121,5 +121,6 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		HandedOut: s.tasks.HandedOutCount(),
 		Delayed:   s.tasks.DelayedCount(),
 		Dead:      s.tasks.DeadCount(),
+		Totals:    s.tasks.Totals(),
 	})
 }
